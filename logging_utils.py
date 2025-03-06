@@ -10,7 +10,7 @@ def setup_logging():
     log_folder = 'logs'
     if not os.path.exists(log_folder):
         os.makedirs(log_folder)
-    timestamp = time.strftime('%Y%m%d%H%M%S')
+    timestamp = time.strftime('%Y_%m_%d_%H_%M_%S')
     log_file = os.path.join(log_folder, f'log_{timestamp}.txt')
 
     # 设置彩色日志格式
