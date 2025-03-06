@@ -109,7 +109,9 @@ class MainWindow(QMainWindow):
 
         self.start_btn = QPushButton("开始抓包")
         self.stop_btn = QPushButton("停止抓包")
+        self.stop_btn.setEnabled(False)
         self.clear_btn = QPushButton("清空数据")
+        self.clear_btn.setEnabled(False)
         self.status_label = QLabel("就绪")
 
         # 布局
@@ -162,6 +164,7 @@ class MainWindow(QMainWindow):
         """
         self.table.setRowCount(0)
         self.packet_count = 0
+        self.clear_btn.setEnabled(False)
 
     def update_table(self, packet_info):
         """
@@ -179,6 +182,8 @@ class MainWindow(QMainWindow):
 
         # 自动滚动到最后一行
         self.table.scrollToBottom()
+        if self.packet_count == 1:
+            self.clear_btn.setEnabled(True)
 
 
 if __name__ == "__main__":
