@@ -251,4 +251,5 @@ if __name__ == "__main__":
     app = QApplication(sys.argv)
     window = MainWindow()
     window.show()
+    window.start_sniffing() # 开始抓包
     sys.exit(app.exec_())
