@@ -1,3 +1,4 @@
+import json
 import sys
 from collections import defaultdict
 
@@ -49,7 +50,11 @@ class SnifferThread(QThread):
         """
         if not self.running:
             return
-        packet_info = self.parse_packet(packet)
+        try:
+            packet_info = self.parse_packet(packet)
+        except:
+            logger.error(f"解析数据包失败: {packet.summary()}")
+            return
         if packet_info:
             self.new_packet.emit(packet_info)
 
@@ -171,11 +176,11 @@ class SnifferThread(QThread):
 
         # 生成简化版协议类型
         info['protocol_type'] = '/'.join(info['layers'].keys())
-        # 设置info['type']为info['layers']最后一个
-        layers = list(info['layers'].keys())
-        info['type'] = layers[-1]
-        # 设置info['detail']为info['layers']每一个的信息
-        info['detail'] = '\n'.join([f"{layer}: {info['layers'][layer]}" for layer in layers])
+        # 设置info['detail']为info['layers']的json字符串
+        try:
+            info["detail"] = json.dumps(info['layers'])
+        except:
+            info["detail"] = str(info['layers'])
         return info
 
     def stop(self):
