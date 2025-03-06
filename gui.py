@@ -8,7 +8,7 @@ from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, QH
                              QPushButton, QTableWidget, QTableWidgetItem, QLabel, QLineEdit,
                              QHeaderView, QSplitter)
 
-from sniffer_parse import SnifferThread
+from parse import SnifferThread
 
 
 class MainWindow(QMainWindow):
@@ -183,9 +183,3 @@ class MainWindow(QMainWindow):
         self.clear_btn.setEnabled(False)
         self.update_chart()
 
-
-if __name__ == "__main__":
-    app = QApplication(sys.argv)
-    window = MainWindow()
-    window.show()
-    sys.exit(app.exec_())
