@@ -8,8 +8,17 @@ from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, QH
                              QPushButton, QTableWidget, QTableWidgetItem, QLabel, QLineEdit,
                              QHeaderView, QSplitter)
 from scapy.layers.dns import DNS
-from scapy.layers.inet import IP, ICMP, TCP, UDP
+from scapy.layers.http import HTTPRequest, HTTPResponse
+from scapy.layers.inet import IP, TCP, UDP, ICMP
+from scapy.layers.inet6 import IPv6
+from scapy.layers.l2 import Ether, ARP
+from scapy.layers.tls.record import TLS
+from scapy.packet import Raw
 from scapy.sendrecv import sniff
+
+from logging_utils import setup_logging
+
+logger = setup_logging()
 
 
 class SnifferThread(QThread):
@@ -31,7 +40,7 @@ class SnifferThread(QThread):
         开始抓包
         """
         self.running = True
-        sniff(prn=self.process_packet, store=0, stop_filter=lambda _: not self.running)
+        sniff(prn=self.process_packet, store=0, stop_filter=lambda _: not self.running, filter=self.filter)
 
     def process_packet(self, packet):
         """
@@ -53,26 +62,120 @@ class SnifferThread(QThread):
         if not packet.haslayer(IP):
             return {}
 
-        info = {
-            'src': packet[IP].src,
-            'dst': packet[IP].dst,
-            'protocol': packet[IP].proto
-        }
+        info = {'layers': {}}
 
-        if packet.haslayer(ICMP):
-            info['type'] = f"ICMP({packet[ICMP].type})"
-            info['protocol_type'] = 'ICMP'
-        elif packet.haslayer(TCP):
-            info['type'] = f"TCP({packet[TCP].sport}->{packet[TCP].dport})"
-            info['protocol_type'] = 'TCP'
+        # 物理层/数据链路层（Ethernet）
+        if packet.haslayer(Ether):
+            eth = packet[Ether]
+            info['layers']['eth'] = {
+                'srcmac': eth.src,
+                'dstmac': eth.dst,
+                'type': eth.type
+            }
+
+        # 网络层（IP/IPv6/ARP等）
+        if packet.haslayer(IP):
+            ip = packet[IP]
+            info['layers']['ip'] = {
+                'src': ip.src,
+                'dst': ip.dst,
+                'proto': ip.proto,
+                'ttl': ip.ttl,
+                'len': ip.len
+            }
+            info['src'] = ip.src
+            info['dst'] = ip.dst
+            info['len'] = ip.len
+        elif packet.haslayer(IPv6):
+            ipv6 = packet[IPv6]
+            info['layers']['ipv6'] = {
+                'src': ipv6.src,
+                'dst': ipv6.dst,
+                'nh': ipv6.nh
+            }
+        elif packet.haslayer(ARP):
+            arp = packet[ARP]
+            info['layers']['arp'] = {
+                'op': arp.op,
+                'hwsrc': arp.hwsrc,
+                'psrc': arp.psrc,
+                'hwdst': arp.hwdst,
+                'pdst': arp.pdst
+            }
+            return info  # ARP包没有更高层协议
+
+        # 传输层（TCP/UDP/ICMP等）
+        if packet.haslayer(TCP):
+            tcp = packet[TCP]
+            info['layers']['tcp'] = {
+                'sport': tcp.sport,
+                'dport': tcp.dport,
+                'flags': tcp.flags,
+                'seq': tcp.seq,
+                'ack': tcp.ack
+            }
         elif packet.haslayer(UDP):
-            info['type'] = f"UDP({packet[UDP].sport}->{packet[UDP].dport})"
-            info['protocol_type'] = 'UDP'
-            if packet.haslayer(DNS) and packet[DNS].qd:
-                info['detail'] = str(packet[DNS].qd.qname)
-        else:
-            info['type'] = "Other"
-            info['protocol_type'] = 'Other'
+            udp = packet[UDP]
+            info['layers']['udp'] = {
+                'sport': udp.sport,
+                'dport': udp.dport,
+                'len': udp.len
+            }
+        elif packet.haslayer(ICMP):
+            icmp = packet[ICMP]
+            info['layers']['icmp'] = {
+                'type': icmp.type,
+                'code': icmp.code,
+                'id': icmp.id,
+                'seq': icmp.seq
+            }
+
+        # 应用层协议解析
+        if packet.haslayer(DNS):
+            dns = packet[DNS]
+            info['layers']['dns'] = {
+                'qd': str(dns.qd.qname) if dns.qd else None,
+                'an': [str(rr.rdata) for rr in dns.an] if dns.an else None
+            }
+
+        if packet.haslayer(HTTPRequest):
+            http = packet[HTTPRequest]
+            info['layers']['http'] = {
+                'method': http.Method.decode(),
+                'host': http.Host.decode(),
+                'path': http.Path.decode()
+            }
+        elif packet.haslayer(HTTPResponse):
+            http = packet[HTTPResponse]
+            info['layers']['http'] = {
+                'status': http.Status_Code.decode(),
+                'reason': http.Reason_Phrase.decode()
+            }
+
+        # TLS/SSL握手信息（HTTPS）
+        if packet.haslayer(TLS):
+            tls = packet[TLS]
+            info['layers']['tls'] = {
+                'version': tls.version,
+                # 'handshake_type': tls.handshake_type if tls.handshake else None
+            }
+
+        # 原始负载（Payload）
+        if packet.haslayer(Raw):
+            raw = packet[Raw].load
+            try:
+                info['layers']['payload'] = raw.decode('utf-8', errors='ignore')
+            except:
+                logger.error(f"无法解码负载数据: {raw}")
+                info['layers']['payload'] = str(raw)
+
+        # 生成简化版协议类型
+        info['protocol_type'] = '/'.join(info['layers'].keys())
+        # 设置info['type']为info['layers']最后一个
+        layers = list(info['layers'].keys())
+        info['type'] = layers[-1]
+        # 设置info['detail']为info['layers']每一个的信息
+        info['detail'] = '\n'.join([f"{layer}: {info['layers'][layer]}" for layer in layers])
         return info
 
     def stop(self):
@@ -117,13 +220,14 @@ class MainWindow(QMainWindow):
 
         # 数据表格
         self.table = QTableWidget()
-        self.table.setColumnCount(4)
-        self.table.setHorizontalHeaderLabels(["源地址", "目标地址", "协议类型", "详细信息"])
+        self.table.setColumnCount(5)
+        self.table.setHorizontalHeaderLabels(["源地址", "目标地址", "协议类型", "长度", "详细信息"])
         self.table.horizontalHeader().setStretchLastSection(QHeaderView.Stretch)
         self.table.horizontalHeader().resizeSections(QHeaderView.ResizeToContents)
         self.table.setColumnWidth(0, 200)
         self.table.setColumnWidth(1, 200)
         self.table.setColumnWidth(2, 200)
+        self.table.setColumnWidth(3, 100)
 
         self.filter_input = QLineEdit()
         self.filter_input.setPlaceholderText("输入BPF过滤器 (例如 tcp port 80)")
@@ -226,7 +330,8 @@ class MainWindow(QMainWindow):
         self.table.setItem(row, 0, QTableWidgetItem(packet_info.get('src', '')))
         self.table.setItem(row, 1, QTableWidgetItem(packet_info.get('dst', '')))
         self.table.setItem(row, 2, QTableWidgetItem(packet_info.get('type', '')))
-        self.table.setItem(row, 3, QTableWidgetItem(packet_info.get('detail', '')))
+        self.table.setItem(row, 3, QTableWidgetItem(packet_info.get('len', '')))
+        self.table.setItem(row, 4, QTableWidgetItem(packet_info.get('detail', '')))
 
         # 自动滚动到最后一行
         self.table.scrollToBottom()
