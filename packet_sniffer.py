@@ -1,5 +1,3 @@
-import sys
-
 from scapy.layers.dns import DNS
 from scapy.layers.inet import IP, ICMP, TCP, UDP
 from scapy.sendrecv import sniff
@@ -37,9 +35,4 @@ def packet_handler(packet):
 
 
 # 抓包逻辑
-try:
-    logger.info("开始抓包，按Ctrl+C停止...")
-    sniff(prn=packet_handler, store=0)
-except KeyboardInterrupt:
-    logger.info("抓包结束，退出程序...")
-    sys.exit(0)
+sniff(prn=packet_handler, store=0)
