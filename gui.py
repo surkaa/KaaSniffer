@@ -1,8 +1,9 @@
+import os
 from collections import defaultdict
 
 from PyQt5.QtChart import QChart, QChartView, QPieSeries
 from PyQt5.QtCore import Qt, QTimer
-from PyQt5.QtGui import QPainter
+from PyQt5.QtGui import QPainter, QIcon
 from PyQt5.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
                              QPushButton, QTableWidget, QTableWidgetItem, QLabel, QLineEdit,
                              QHeaderView, QSplitter, QMessageBox)
@@ -20,6 +21,9 @@ class MainWindow(QMainWindow):
         初始化
         """
         super().__init__()
+        base_dir = os.path.dirname(os.path.abspath(__file__))
+        icon_path = os.path.join(base_dir, 'app.ico')
+        self.setWindowIcon(QIcon(icon_path))
         self.sniffer = None
         self.packet_count = 0
         self.draw_count = self.packet_count
