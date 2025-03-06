@@ -180,6 +180,7 @@ class SnifferThread(QThread):
         last_layer = layers[-1]
         if last_layer == 'payload':
             last_layer = layers[-2]
+        info['layers_link'] = '/'.join(info['layers'].keys())
         info['last_type'] = last_layer
         # 设置info['detail']为info['layers']的json字符串
         try:

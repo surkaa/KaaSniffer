@@ -35,7 +35,7 @@ class MainWindow(QMainWindow):
         """
         # 主窗口设置
         self.setWindowTitle("Scapy 网络抓包分析器")
-        self.setGeometry(300, 300, 1200, 800)
+        self.setGeometry(100, 100, 1600, 1200)
 
         # 主分割器
         splitter = QSplitter(Qt.Vertical)
@@ -46,14 +46,15 @@ class MainWindow(QMainWindow):
 
         # 数据表格
         self.table = QTableWidget()
-        self.table.setColumnCount(5)
-        self.table.setHorizontalHeaderLabels(["源地址", "目标地址", "协议类型", "长度", "详细信息"])
+        self.table.setColumnCount(6)
+        self.table.setHorizontalHeaderLabels(["源地址", "目标地址", "协议类型", "长度", "协议链路", "详细信息"])
         self.table.horizontalHeader().setStretchLastSection(QHeaderView.Stretch)
         self.table.horizontalHeader().resizeSections(QHeaderView.ResizeToContents)
-        self.table.setColumnWidth(0, 200)
-        self.table.setColumnWidth(1, 200)
-        self.table.setColumnWidth(2, 200)
-        self.table.setColumnWidth(3, 100)
+        self.table.setColumnWidth(0, 125)
+        self.table.setColumnWidth(1, 125)
+        self.table.setColumnWidth(2, 80)
+        self.table.setColumnWidth(3, 60)
+        self.table.setColumnWidth(4, 200)
 
         self.filter_input = QLineEdit()
         self.filter_input.setPlaceholderText("输入BPF过滤器 (例如 tcp port 80)")
@@ -157,7 +158,8 @@ class MainWindow(QMainWindow):
         self.table.setItem(row, 1, QTableWidgetItem(packet_info.get('dst', '')))
         self.table.setItem(row, 2, QTableWidgetItem(packet_info.get('last_type', '')))
         self.table.setItem(row, 3, QTableWidgetItem(str(packet_info.get('len', ''))))
-        self.table.setItem(row, 4, QTableWidgetItem(packet_info.get('detail', '')))
+        self.table.setItem(row, 4, QTableWidgetItem(packet_info.get('layers_link', '')))
+        self.table.setItem(row, 5, QTableWidgetItem(packet_info.get('detail', '')))
 
         # 自动滚动到最后一行
         self.table.scrollToBottom()
