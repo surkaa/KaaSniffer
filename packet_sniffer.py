@@ -175,7 +175,13 @@ class SnifferThread(QThread):
                 info['layers']['payload'] = str(raw)
 
         # 生成简化版协议类型
-        info['protocol_type'] = '/'.join(info['layers'].keys())
+        layers = list(info['layers'].keys())
+        if len(layers) == 0:
+            return {}
+        last_layer = layers[-1]
+        if last_layer == 'payload':
+            last_layer = layers[-2]
+        info['last_type'] = last_layer
         # 设置info['detail']为info['layers']的json字符串
         try:
             info["detail"] = json.dumps(info['layers'])
@@ -320,8 +326,8 @@ class MainWindow(QMainWindow):
 
     def update_interface(self, packet_info):
         self.update_table(packet_info)
-        protocol_type = packet_info.get('protocol_type', 'Other')
-        self.protocol_stats[protocol_type] += 1
+        last_type = packet_info.get('last_type', 'Other')
+        self.protocol_stats[last_type] += 1
 
     def update_table(self, packet_info):
         """
@@ -334,7 +340,7 @@ class MainWindow(QMainWindow):
 
         self.table.setItem(row, 0, QTableWidgetItem(packet_info.get('src', '')))
         self.table.setItem(row, 1, QTableWidgetItem(packet_info.get('dst', '')))
-        self.table.setItem(row, 2, QTableWidgetItem(packet_info.get('type', '')))
+        self.table.setItem(row, 2, QTableWidgetItem(packet_info.get('last_type', '')))
         self.table.setItem(row, 3, QTableWidgetItem(packet_info.get('len', '')))
         self.table.setItem(row, 4, QTableWidgetItem(packet_info.get('detail', '')))
 
