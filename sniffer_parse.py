@@ -46,7 +46,7 @@ class SnifferThread(QThread):
         try:
             packet_info = self.parse_packet(packet)
         except:
-            logger.error(f"解析数据包失败: {packet.summary()}")
+            # logger.error(f"解析数据包失败: {packet.summary()}")
             return
         if packet_info:
             self.new_packet.emit(packet_info)
