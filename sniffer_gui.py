@@ -8,7 +8,7 @@ from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, QH
                              QPushButton, QTableWidget, QTableWidgetItem, QLabel, QLineEdit,
                              QHeaderView, QSplitter)
 
-from sniffer_handler import SnifferThread
+from sniffer_parse import SnifferThread
 
 
 class MainWindow(QMainWindow):
