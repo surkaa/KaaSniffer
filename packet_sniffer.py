@@ -1,8 +1,12 @@
 import sys
+from collections import defaultdict
 
-from PyQt5.QtCore import QThread, pyqtSignal
+from PyQt5.QtChart import QChart, QChartView, QPieSeries
+from PyQt5.QtCore import QThread, pyqtSignal, Qt, QTimer
+from PyQt5.QtGui import QPainter
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
-                             QPushButton, QTableWidget, QTableWidgetItem, QLabel, QLineEdit, QHeaderView)
+                             QPushButton, QTableWidget, QTableWidgetItem, QLabel, QLineEdit,
+                             QHeaderView, QSplitter)
 from scapy.layers.dns import DNS
 from scapy.layers.inet import IP, ICMP, TCP, UDP
 from scapy.sendrecv import sniff
@@ -88,7 +92,11 @@ class MainWindow(QMainWindow):
         super().__init__()
         self.sniffer = None
         self.packet_count = 0
+        self.draw_count = self.packet_count
+        self.protocol_stats = defaultdict(int)
         self.init_ui()
+        self.setup_chart()
+        self.setup_timer()
 
     def init_ui(self):
         """
@@ -98,7 +106,14 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("Scapy 网络抓包分析器")
         self.setGeometry(300, 300, 1200, 800)
 
-        # 控件
+        # 主分割器
+        splitter = QSplitter(Qt.Vertical)
+
+        # 上半部分：控制面板和表格
+        top_widget = QWidget()
+        top_layout = QVBoxLayout(top_widget)
+
+        # 数据表格
         self.table = QTableWidget()
         self.table.setColumnCount(4)
         self.table.setHorizontalHeaderLabels(["源地址", "目标地址", "协议类型", "详细信息"])
@@ -118,26 +133,67 @@ class MainWindow(QMainWindow):
         self.clear_btn.setEnabled(False)
         self.status_label = QLabel("就绪")
 
-        # 布局
+        # 布局 控制面板
         control_layout = QHBoxLayout()
         control_layout.addWidget(self.start_btn)
         control_layout.addWidget(self.stop_btn)
         control_layout.addWidget(self.clear_btn)
         control_layout.addWidget(self.filter_input)
 
-        main_layout = QVBoxLayout()
-        main_layout.addLayout(control_layout)
-        main_layout.addWidget(self.table)
-        main_layout.addWidget(self.status_label)
+        top_layout.addLayout(control_layout)
+        top_layout.addWidget(self.table)
 
-        container = QWidget()
-        container.setLayout(main_layout)
-        self.setCentralWidget(container)
+        # 下半部分：统计图表
+        self.chart_view = QChartView()
+        self.chart_view.setRenderHint(QPainter.Antialiasing)
+
+        splitter.addWidget(top_widget)
+        splitter.addWidget(self.chart_view)
+        splitter.setSizes([500, 300])
+
+        self.setCentralWidget(splitter)
+        self.status_label = QLabel("就绪")
+        self.statusBar().addWidget(self.status_label)
 
         # 信号连接
         self.start_btn.clicked.connect(self.start_sniffing)
         self.stop_btn.clicked.connect(self.stop_sniffing)
         self.clear_btn.clicked.connect(self.clear_data)
+
+    def setup_chart(self):
+        """
+        设置图表
+        """
+        self.chart = QChart()
+        self.chart.setTitle("协议分布统计")
+        self.chart.setAnimationOptions(QChart.SeriesAnimations)
+        self.chart_view.setChart(self.chart)
+
+    def setup_timer(self):
+        """
+        设置定时器
+        """
+        self.update_timer = QTimer()
+        self.update_timer.timeout.connect(self.update_chart)
+        self.update_timer.start(5000)
+
+    def update_chart(self):
+        """
+        更新图表
+        """
+        if self.draw_count == self.packet_count:
+            return
+        self.draw_count = self.packet_count  # 更新绘制计数
+        series = QPieSeries()
+        total = sum(self.protocol_stats.values())
+
+        for protocol, count in self.protocol_stats.items():
+            if count > 0:
+                percentage = count / total * 100
+                series.append(f"{protocol} ({count} | {percentage:.1f}%)", count).setLabelVisible(True)
+
+        self.chart.removeAllSeries()
+        self.chart.addSeries(series)
 
     def start_sniffing(self):
         """
@@ -145,30 +201,16 @@ class MainWindow(QMainWindow):
         """
         if not self.sniffer or not self.sniffer.isRunning():
             self.sniffer = SnifferThread(filter=self.filter_input.text())
-            self.sniffer.new_packet.connect(self.update_table)
+            self.sniffer.new_packet.connect(self.update_interface)
             self.sniffer.start()
             self.status_label.setText("抓包运行中...")
             self.start_btn.setEnabled(False)
             self.stop_btn.setEnabled(True)
 
-    def stop_sniffing(self):
-        """
-        停止抓包
-        """
-        if self.sniffer and self.sniffer.isRunning():
-            self.sniffer.stop()
-            self.sniffer.quit()
-            self.status_label.setText("已停止")
-            self.start_btn.setEnabled(True)
-            self.stop_btn.setEnabled(False)
-
-    def clear_data(self):
-        """
-        清空数据
-        """
-        self.table.setRowCount(0)
-        self.packet_count = 0
-        self.clear_btn.setEnabled(False)
+    def update_interface(self, packet_info):
+        self.update_table(packet_info)
+        protocol_type = packet_info.get('protocol_type', 'Other')
+        self.protocol_stats[protocol_type] += 1
 
     def update_table(self, packet_info):
         """
@@ -188,6 +230,21 @@ class MainWindow(QMainWindow):
         self.table.scrollToBottom()
         if self.packet_count == 1:
             self.clear_btn.setEnabled(True)
+
+    def stop_sniffing(self):
+        if self.sniffer and self.sniffer.isRunning():
+            self.sniffer.stop()
+            self.sniffer.quit()
+            self.status_label.setText("已停止")
+            self.start_btn.setEnabled(True)
+            self.stop_btn.setEnabled(False)
+
+    def clear_data(self):
+        self.table.setRowCount(0)
+        self.packet_count = 0
+        self.protocol_stats.clear()
+        self.clear_btn.setEnabled(False)
+        self.update_chart()
 
 
 if __name__ == "__main__":
