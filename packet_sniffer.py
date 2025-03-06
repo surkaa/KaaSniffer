@@ -1,11 +1,11 @@
-import logging
 import sys
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-logger = logging.getLogger(__name__)
+from logging_utils import setup_logging
 
 from scapy.layers.inet import IP, ICMP
 from scapy.sendrecv import sniff
+
+logger = setup_logging()
 
 
 def packet_handler(packet):
