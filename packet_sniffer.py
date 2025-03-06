@@ -67,7 +67,7 @@ class SnifferThread(QThread):
         if not packet.haslayer(IP):
             return {}
 
-        info = {'layers': {}}
+        info = {'layers': {}, 'len': 0, 'src': '', 'dst': '', 'last_type': ''}
 
         # 物理层/数据链路层（Ethernet）
         if packet.haslayer(Ether):
@@ -98,6 +98,9 @@ class SnifferThread(QThread):
                 'dst': ipv6.dst,
                 'nh': ipv6.nh
             }
+            info['src'] = ipv6.src
+            info['dst'] = ipv6.dst
+            info['len'] = ipv6.plen
         elif packet.haslayer(ARP):
             arp = packet[ARP]
             info['layers']['arp'] = {
@@ -107,6 +110,9 @@ class SnifferThread(QThread):
                 'hwdst': arp.hwdst,
                 'pdst': arp.pdst
             }
+            info['src'] = arp.psrc
+            info['dst'] = arp.pdst
+            info['len'] = 0
             return info  # ARP包没有更高层协议
 
         # 传输层（TCP/UDP/ICMP等）
@@ -341,7 +347,7 @@ class MainWindow(QMainWindow):
         self.table.setItem(row, 0, QTableWidgetItem(packet_info.get('src', '')))
         self.table.setItem(row, 1, QTableWidgetItem(packet_info.get('dst', '')))
         self.table.setItem(row, 2, QTableWidgetItem(packet_info.get('last_type', '')))
-        self.table.setItem(row, 3, QTableWidgetItem(packet_info.get('len', '')))
+        self.table.setItem(row, 3, QTableWidgetItem(str(packet_info.get('len', ''))))
         self.table.setItem(row, 4, QTableWidgetItem(packet_info.get('detail', '')))
 
         # 自动滚动到最后一行
@@ -369,5 +375,4 @@ if __name__ == "__main__":
     app = QApplication(sys.argv)
     window = MainWindow()
     window.show()
-    window.start_sniffing()  # 开始抓包
     sys.exit(app.exec_())
