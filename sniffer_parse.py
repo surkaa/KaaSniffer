@@ -1,3 +1,4 @@
+import binascii
 import json
 
 from PyQt5.QtCore import QThread, pyqtSignal
@@ -168,10 +169,14 @@ class SnifferThread(QThread):
         if packet.haslayer(Raw):
             raw = packet[Raw].load
             try:
-                info['layers']['payload'] = raw.decode('utf-8', errors='ignore')
+                # 转为规范的十六进制字符串（每字节两位，空格分隔）
+                hex_str = binascii.hexlify(raw).decode('utf-8')
+                # 按每2字符（1字节）添加空格分隔，更易读
+                formatted_hex = ' '.join(hex_str[i:i + 2] for i in range(0, len(hex_str), 2))
+                info['layers']['payload'] = formatted_hex
             except:
                 logger.error(f"无法解码负载数据: {raw}")
-                info['layers']['payload'] = str(raw)
+                info['layers']['payload'] = '无法解析的数据'
 
         # 生成简化版协议类型
         layers = list(info['layers'].keys())

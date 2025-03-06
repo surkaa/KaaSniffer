@@ -58,6 +58,8 @@ class MainWindow(QMainWindow):
 
         self.filter_input = QLineEdit()
         self.filter_input.setPlaceholderText("输入BPF过滤器 (例如 tcp port 80)")
+        # filter_input 回车事件
+        self.filter_input.returnPressed.connect(self.start_sniffing)
 
         self.start_btn = QPushButton("开始抓包")
         self.stop_btn = QPushButton("停止抓包")
