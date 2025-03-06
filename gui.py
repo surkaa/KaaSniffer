@@ -5,7 +5,7 @@ from PyQt5.QtCore import Qt, QTimer
 from PyQt5.QtGui import QPainter
 from PyQt5.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
                              QPushButton, QTableWidget, QTableWidgetItem, QLabel, QLineEdit,
-                             QHeaderView, QSplitter)
+                             QHeaderView, QSplitter, QMessageBox)
 
 from parse import SnifferThread
 
@@ -27,6 +27,8 @@ class MainWindow(QMainWindow):
         self.init_ui()
         self.setup_chart()
         self.setup_timer()
+        # 连接双击信号到处理函数
+        self.table.itemDoubleClicked.connect(self.on_table_double_clicked)
 
     def init_ui(self):
         """
@@ -181,4 +183,28 @@ class MainWindow(QMainWindow):
         self.protocol_stats.clear()
         self.clear_btn.setEnabled(False)
         self.update_chart()
+
+    def on_table_double_clicked(self, item):
+        """ 处理表格双击事件 """
+        row = item.row()
+        # 获取各列数据（可选）
+        src = self.table.item(row, 0).text()
+        dst = self.table.item(row, 1).text()
+        protocol = self.table.item(row, 2).text()
+        length = self.table.item(row, 3).text()
+        layers = self.table.item(row, 4).text()
+        detail = self.table.item(row, 5).text()
+
+        # 构建详细信息文本（可根据需要调整格式）
+        full_detail = (
+            f"源地址: {src}\n"
+            f"目标地址: {dst}\n"
+            f"协议类型: {protocol}\n"
+            f"长度: {length}\n"
+            f"协议链路: {layers}\n"
+            f"\n详细信息:\n{detail}"
+        )
+
+        # 弹窗显示
+        QMessageBox.information(self, "数据包详细信息", full_detail)
 
