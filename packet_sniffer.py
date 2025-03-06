@@ -1,38 +1,144 @@
+import sys
+
+from PyQt5.QtCore import QThread, pyqtSignal
+from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
+                             QPushButton, QTableWidget, QTableWidgetItem, QLabel, QLineEdit, QHeaderView)
 from scapy.layers.dns import DNS
 from scapy.layers.inet import IP, ICMP, TCP, UDP
 from scapy.sendrecv import sniff
 
-from logging_utils import setup_logging
 
-logger = setup_logging()
+class SnifferThread(QThread):
+    new_packet = pyqtSignal(dict)  # 定义数据包信号
 
-# 定义协议处理映射（可扩展）
-PROTOCOL_HANDLERS = {
-    ICMP: lambda p: f"ICMP类型: {p[ICMP].type}",
-    TCP: lambda p: f"TCP端口: {p[TCP].sport}->{p[TCP].dport}",
-    UDP: lambda p: f"UDP端口: {p[UDP].sport}->{p[UDP].dport}",
-    DNS: lambda p: f"DNS查询: {p[DNS].qd.qname}" if p[DNS].qd else None
-}
+    def __init__(self, filter=""):
+        super().__init__()
+        self.filter = filter
+        self.running = False
+
+    def run(self):
+        self.running = True
+        sniff(prn=self.process_packet, store=0, stop_filter=lambda _: not self.running)
+
+    def process_packet(self, packet):
+        if not self.running:
+            return
+        packet_info = self.parse_packet(packet)
+        if packet_info:
+            self.new_packet.emit(packet_info)
+
+    def parse_packet(self, packet):
+        info = {}
+        if packet.haslayer(IP):
+            info['src'] = packet[IP].src
+            info['dst'] = packet[IP].dst
+            info['protocol'] = packet[IP].proto
+
+            if packet.haslayer(ICMP):
+                info['type'] = f"ICMP({packet[ICMP].type})"
+            elif packet.haslayer(TCP):
+                info['type'] = f"TCP({packet[TCP].sport}->{packet[TCP].dport})"
+            elif packet.haslayer(UDP):
+                info['type'] = f"UDP({packet[UDP].sport}->{packet[UDP].dport})"
+                if packet.haslayer(DNS) and packet[DNS].qd:
+                    info['detail'] = str(packet[DNS].qd.qname)
+            else:
+                info['type'] = "Other"
+            return info
+        return None
+
+    def stop(self):
+        self.running = False
 
 
-def packet_handler(packet):
-    log_lines = []
+class MainWindow(QMainWindow):
+    def __init__(self):
+        super().__init__()
+        self.sniffer = None
+        self.packet_count = 0
+        self.init_ui()
 
-    if not packet.haslayer(IP):
-        return
-    # 基础信息
-    log_lines.append(f"{packet[IP].src:>15} -> {packet[IP].dst:<15}")
+    def init_ui(self):
+        # 主窗口设置
+        self.setWindowTitle("Scapy 网络抓包分析器")
+        self.setGeometry(300, 300, 1200, 800)
 
-    # 协议处理
-    for proto, handler in PROTOCOL_HANDLERS.items():
-        if packet.haslayer(proto):
-            result = handler(packet)
-            if result:
-                log_lines.append(result)
+        # 控件
+        self.table = QTableWidget()
+        self.table.setColumnCount(4)
+        self.table.setHorizontalHeaderLabels(["源地址", "目标地址", "协议类型", "详细信息"])
+        self.table.horizontalHeader().setStretchLastSection(QHeaderView.Stretch)
+        self.table.horizontalHeader().resizeSections(QHeaderView.ResizeToContents)
+        self.table.setColumnWidth(0, 200)
+        self.table.setColumnWidth(1, 200)
+        self.table.setColumnWidth(2, 200)
 
-    if log_lines:
-        logger.info(" | ".join(log_lines))
+        self.filter_input = QLineEdit()
+        self.filter_input.setPlaceholderText("输入BPF过滤器 (例如 tcp port 80)")
+
+        self.start_btn = QPushButton("开始抓包")
+        self.stop_btn = QPushButton("停止抓包")
+        self.clear_btn = QPushButton("清空数据")
+        self.status_label = QLabel("就绪")
+
+        # 布局
+        control_layout = QHBoxLayout()
+        control_layout.addWidget(self.start_btn)
+        control_layout.addWidget(self.stop_btn)
+        control_layout.addWidget(self.clear_btn)
+        control_layout.addWidget(self.filter_input)
+
+        main_layout = QVBoxLayout()
+        main_layout.addLayout(control_layout)
+        main_layout.addWidget(self.table)
+        main_layout.addWidget(self.status_label)
+
+        container = QWidget()
+        container.setLayout(main_layout)
+        self.setCentralWidget(container)
+
+        # 信号连接
+        self.start_btn.clicked.connect(self.start_sniffing)
+        self.stop_btn.clicked.connect(self.stop_sniffing)
+        self.clear_btn.clicked.connect(self.clear_data)
+
+    def start_sniffing(self):
+        if not self.sniffer or not self.sniffer.isRunning():
+            self.sniffer = SnifferThread(filter=self.filter_input.text())
+            self.sniffer.new_packet.connect(self.update_table)
+            self.sniffer.start()
+            self.status_label.setText("抓包运行中...")
+            self.start_btn.setEnabled(False)
+            self.stop_btn.setEnabled(True)
+
+    def stop_sniffing(self):
+        if self.sniffer and self.sniffer.isRunning():
+            self.sniffer.stop()
+            self.sniffer.quit()
+            self.status_label.setText("已停止")
+            self.start_btn.setEnabled(True)
+            self.stop_btn.setEnabled(False)
+
+    def clear_data(self):
+        self.table.setRowCount(0)
+        self.packet_count = 0
+
+    def update_table(self, packet_info):
+        self.packet_count += 1
+        row = self.table.rowCount()
+        self.table.insertRow(row)
+
+        self.table.setItem(row, 0, QTableWidgetItem(packet_info.get('src', '')))
+        self.table.setItem(row, 1, QTableWidgetItem(packet_info.get('dst', '')))
+        self.table.setItem(row, 2, QTableWidgetItem(packet_info.get('type', '')))
+        self.table.setItem(row, 3, QTableWidgetItem(packet_info.get('detail', '')))
+
+        # 自动滚动到最后一行
+        self.table.scrollToBottom()
 
 
-# 抓包逻辑
-sniff(prn=packet_handler, store=0)
+if __name__ == "__main__":
+    app = QApplication(sys.argv)
+    window = MainWindow()
+    window.show()
+    sys.exit(app.exec_())
