@@ -1,10 +1,9 @@
-import sys
 from collections import defaultdict
 
 from PyQt5.QtChart import QChart, QChartView, QPieSeries
 from PyQt5.QtCore import Qt, QTimer
 from PyQt5.QtGui import QPainter
-from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
+from PyQt5.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
                              QPushButton, QTableWidget, QTableWidgetItem, QLabel, QLineEdit,
                              QHeaderView, QSplitter)
 
