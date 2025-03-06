@@ -50,28 +50,30 @@ class SnifferThread(QThread):
         :param packet: 数据包
         :return: 数据包信息
         """
-        info = {}
-        if packet.haslayer(IP):
-            info['src'] = packet[IP].src
-            info['dst'] = packet[IP].dst
-            info['protocol'] = packet[IP].proto
+        if not packet.haslayer(IP):
+            return {}
 
-            if packet.haslayer(ICMP):
-                info['type'] = f"ICMP({packet[ICMP].type})"
-                info['protocol_type'] = 'ICMP'
-            elif packet.haslayer(TCP):
-                info['type'] = f"TCP({packet[TCP].sport}->{packet[TCP].dport})"
-                info['protocol_type'] = 'TCP'
-            elif packet.haslayer(UDP):
-                info['type'] = f"UDP({packet[UDP].sport}->{packet[UDP].dport})"
-                info['protocol_type'] = 'UDP'
-                if packet.haslayer(DNS) and packet[DNS].qd:
-                    info['detail'] = str(packet[DNS].qd.qname)
-            else:
-                info['type'] = "Other"
-                info['protocol_type'] = 'Other'
-            return info
-        return None
+        info = {
+            'src': packet[IP].src,
+            'dst': packet[IP].dst,
+            'protocol': packet[IP].proto
+        }
+
+        if packet.haslayer(ICMP):
+            info['type'] = f"ICMP({packet[ICMP].type})"
+            info['protocol_type'] = 'ICMP'
+        elif packet.haslayer(TCP):
+            info['type'] = f"TCP({packet[TCP].sport}->{packet[TCP].dport})"
+            info['protocol_type'] = 'TCP'
+        elif packet.haslayer(UDP):
+            info['type'] = f"UDP({packet[UDP].sport}->{packet[UDP].dport})"
+            info['protocol_type'] = 'UDP'
+            if packet.haslayer(DNS) and packet[DNS].qd:
+                info['detail'] = str(packet[DNS].qd.qname)
+        else:
+            info['type'] = "Other"
+            info['protocol_type'] = 'Other'
+        return info
 
     def stop(self):
         """
@@ -251,5 +253,5 @@ if __name__ == "__main__":
     app = QApplication(sys.argv)
     window = MainWindow()
     window.show()
-    window.start_sniffing() # 开始抓包
+    window.start_sniffing()  # 开始抓包
     sys.exit(app.exec_())
