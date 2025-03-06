@@ -54,14 +54,18 @@ class SnifferThread(QThread):
 
             if packet.haslayer(ICMP):
                 info['type'] = f"ICMP({packet[ICMP].type})"
+                info['protocol_type'] = 'ICMP'
             elif packet.haslayer(TCP):
                 info['type'] = f"TCP({packet[TCP].sport}->{packet[TCP].dport})"
+                info['protocol_type'] = 'TCP'
             elif packet.haslayer(UDP):
                 info['type'] = f"UDP({packet[UDP].sport}->{packet[UDP].dport})"
+                info['protocol_type'] = 'UDP'
                 if packet.haslayer(DNS) and packet[DNS].qd:
                     info['detail'] = str(packet[DNS].qd.qname)
             else:
                 info['type'] = "Other"
+                info['protocol_type'] = 'Other'
             return info
         return None
 
