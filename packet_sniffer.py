@@ -9,18 +9,31 @@ from scapy.sendrecv import sniff
 
 
 class SnifferThread(QThread):
+    """
+    网络抓包线程
+    """
     new_packet = pyqtSignal(dict)  # 定义数据包信号
 
     def __init__(self, filter=""):
+        """
+        :param filter: BPF过滤器
+        """
         super().__init__()
         self.filter = filter
         self.running = False
 
     def run(self):
+        """
+        开始抓包
+        """
         self.running = True
         sniff(prn=self.process_packet, store=0, stop_filter=lambda _: not self.running)
 
     def process_packet(self, packet):
+        """
+        处理抓到的数据包 抓到后发送信号
+        :param packet: 抓到的数据包
+        """
         if not self.running:
             return
         packet_info = self.parse_packet(packet)
@@ -28,6 +41,11 @@ class SnifferThread(QThread):
             self.new_packet.emit(packet_info)
 
     def parse_packet(self, packet):
+        """
+        解析数据包
+        :param packet: 数据包
+        :return: 数据包信息
+        """
         info = {}
         if packet.haslayer(IP):
             info['src'] = packet[IP].src
@@ -48,17 +66,30 @@ class SnifferThread(QThread):
         return None
 
     def stop(self):
+        """
+        停止抓包
+        """
         self.running = False
 
 
 class MainWindow(QMainWindow):
+    """
+    主窗口
+    """
+
     def __init__(self):
+        """
+        初始化
+        """
         super().__init__()
         self.sniffer = None
         self.packet_count = 0
         self.init_ui()
 
     def init_ui(self):
+        """
+        初始化UI
+        """
         # 主窗口设置
         self.setWindowTitle("Scapy 网络抓包分析器")
         self.setGeometry(300, 300, 1200, 800)
@@ -103,6 +134,9 @@ class MainWindow(QMainWindow):
         self.clear_btn.clicked.connect(self.clear_data)
 
     def start_sniffing(self):
+        """
+        开始抓包
+        """
         if not self.sniffer or not self.sniffer.isRunning():
             self.sniffer = SnifferThread(filter=self.filter_input.text())
             self.sniffer.new_packet.connect(self.update_table)
@@ -112,6 +146,9 @@ class MainWindow(QMainWindow):
             self.stop_btn.setEnabled(True)
 
     def stop_sniffing(self):
+        """
+        停止抓包
+        """
         if self.sniffer and self.sniffer.isRunning():
             self.sniffer.stop()
             self.sniffer.quit()
@@ -120,10 +157,17 @@ class MainWindow(QMainWindow):
             self.stop_btn.setEnabled(False)
 
     def clear_data(self):
+        """
+        清空数据
+        """
         self.table.setRowCount(0)
         self.packet_count = 0
 
     def update_table(self, packet_info):
+        """
+        更新数据包表格
+        :param packet_info: 数据包信息
+        """
         self.packet_count += 1
         row = self.table.rowCount()
         self.table.insertRow(row)
