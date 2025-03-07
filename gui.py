@@ -8,6 +8,7 @@ from PyQt5.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
                              QPushButton, QTableWidget, QTableWidgetItem, QLabel, QLineEdit,
                              QHeaderView, QSplitter, QMessageBox)
 
+from database import SnifferDB
 from parse import SnifferThread
 
 
@@ -25,6 +26,7 @@ class MainWindow(QMainWindow):
         icon_path = os.path.join(base_dir, 'app.ico')
         self.setWindowIcon(QIcon(icon_path))
         self.sniffer = None
+        self.db = SnifferDB()
         self.packet_count = 0
         self.draw_count = self.packet_count
         self.protocol_stats = defaultdict(int)
@@ -149,6 +151,7 @@ class MainWindow(QMainWindow):
 
     def update_interface(self, packet_info):
         self.update_table(packet_info)
+        self.db.insert_packet(packet_info)
         packet_protocol = packet_info.get('packet_protocol', 'Other')
         self.protocol_stats[packet_protocol] += 1
 
