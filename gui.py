@@ -161,12 +161,18 @@ class MainWindow(QMainWindow):
         row = self.table.rowCount()
         self.table.insertRow(row)
 
-        self.table.setItem(row, 0, QTableWidgetItem(packet_info.get('src', '')))
-        self.table.setItem(row, 1, QTableWidgetItem(packet_info.get('dst', '')))
-        self.table.setItem(row, 2, QTableWidgetItem(packet_info.get('last_type', '')))
-        self.table.setItem(row, 3, QTableWidgetItem(str(packet_info.get('len', ''))))
-        self.table.setItem(row, 4, QTableWidgetItem(packet_info.get('layers_link', '')))
-        self.table.setItem(row, 5, QTableWidgetItem(packet_info.get('detail', '')))
+        # 创建单元格并设置不可编辑
+        def create_non_editable_item(text):
+            item = QTableWidgetItem(text)
+            item.setFlags(item.flags() & ~Qt.ItemIsEditable)  # 移除可编辑标志
+            return item
+
+        self.table.setItem(row, 0, create_non_editable_item(packet_info.get('src', '')))
+        self.table.setItem(row, 1, create_non_editable_item(packet_info.get('dst', '')))
+        self.table.setItem(row, 2, create_non_editable_item(packet_info.get('last_type', '')))
+        self.table.setItem(row, 3, create_non_editable_item(str(packet_info.get('len', ''))))
+        self.table.setItem(row, 4, create_non_editable_item(packet_info.get('layers_link', '')))
+        self.table.setItem(row, 5, create_non_editable_item(packet_info.get('detail', '')))
 
         # 自动滚动到最后一行
         self.table.scrollToBottom()
