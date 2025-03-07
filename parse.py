@@ -107,7 +107,7 @@ class SnifferThread(QThread):
             info['src'] = arp.psrc
             info['dst'] = arp.pdst
             info['len'] = 0
-            return info  # ARP包没有更高层协议
+            return self.generateInfo(info)
 
         # 传输层（TCP/UDP/ICMP等）
         if packet.haslayer(TCP):
@@ -178,6 +178,9 @@ class SnifferThread(QThread):
                 logger.error(f"无法解码负载数据: {raw}")
                 info['layers']['payload'] = '无法解析的数据'
 
+        return self.generateInfo(info)
+
+    def generateInfo(self, info):
         # 生成简化版协议类型
         layers = list(info['layers'].keys())
         if len(layers) == 0:
