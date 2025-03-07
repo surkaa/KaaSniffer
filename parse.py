@@ -61,7 +61,7 @@ class SnifferThread(QThread):
         if not packet.haslayer(IP):
             return {}
 
-        info = {'layers': {}, 'len': 0, 'src': '', 'dst': '', 'last_type': ''}
+        info = {'layers': {}, 'len': 0, 'src': '', 'dst': '', 'packet_protocol': ''}
 
         # 物理层/数据链路层（Ethernet）
         if packet.haslayer(Ether):
@@ -107,7 +107,7 @@ class SnifferThread(QThread):
             info['src'] = arp.psrc
             info['dst'] = arp.pdst
             info['len'] = 0
-            return self.generateInfo(info)
+            return self.generateInfo(info, packet)
 
         # 传输层（TCP/UDP/ICMP等）
         if packet.haslayer(TCP):
@@ -178,9 +178,9 @@ class SnifferThread(QThread):
                 logger.error(f"无法解码负载数据: {raw}")
                 info['layers']['payload'] = '无法解析的数据'
 
-        return self.generateInfo(info)
+        return self.generateInfo(info, packet)
 
-    def generateInfo(self, info):
+    def generateInfo(self, info, packet):
         # 生成简化版协议类型
         layers = list(info['layers'].keys())
         if len(layers) == 0:
@@ -189,12 +189,15 @@ class SnifferThread(QThread):
         if last_layer == 'payload':
             last_layer = layers[-2]
         info['layers_link'] = '/'.join(info['layers'].keys())
-        info['last_type'] = last_layer.upper()
+        info['packet_protocol'] = last_layer.upper()
         # 设置info['detail']为info['layers']的json字符串
         try:
             info["detail"] = json.dumps(info['layers'])
         except:
             info["detail"] = str(info['layers'])
+        # 设置info['raw']为原始数据包的16进制字符串
+        info['raw'] = bytes(packet).hex()
+        info['layers'] = None
         return info
 
     def stop(self):

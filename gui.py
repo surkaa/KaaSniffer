@@ -149,8 +149,8 @@ class MainWindow(QMainWindow):
 
     def update_interface(self, packet_info):
         self.update_table(packet_info)
-        last_type = packet_info.get('last_type', 'Other')
-        self.protocol_stats[last_type] += 1
+        packet_protocol = packet_info.get('packet_protocol', 'Other')
+        self.protocol_stats[packet_protocol] += 1
 
     def update_table(self, packet_info):
         """
@@ -169,7 +169,7 @@ class MainWindow(QMainWindow):
 
         self.table.setItem(row, 0, create_non_editable_item(packet_info.get('src', '')))
         self.table.setItem(row, 1, create_non_editable_item(packet_info.get('dst', '')))
-        self.table.setItem(row, 2, create_non_editable_item(packet_info.get('last_type', '')))
+        self.table.setItem(row, 2, create_non_editable_item(packet_info.get('packet_protocol', '')))
         self.table.setItem(row, 3, create_non_editable_item(str(packet_info.get('len', ''))))
         self.table.setItem(row, 4, create_non_editable_item(packet_info.get('layers_link', '')))
         self.table.setItem(row, 5, create_non_editable_item(packet_info.get('detail', '')))
