@@ -1,7 +1,7 @@
 import os
 from collections import defaultdict
 
-from PyQt5.QtChart import QChart, QChartView, QPieSeries
+from PyQt5.QtChart import QChart, QChartView, QPieSeries, QPieSlice
 from PyQt5.QtCore import Qt, QTimer
 from PyQt5.QtGui import QPainter, QIcon
 from PyQt5.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
@@ -103,13 +103,19 @@ class MainWindow(QMainWindow):
         self.clear_btn.clicked.connect(self.clear_data)
 
     def setup_chart(self):
-        """
-        设置图表
-        """
+        """初始化图表并创建基础系列"""
         self.chart = QChart()
         self.chart.setTitle("协议分布统计")
         self.chart.setAnimationOptions(QChart.SeriesAnimations)
+
+        # 创建并添加饼图系列
+        self.series = QPieSeries()
+        self.chart.addSeries(self.series)
+        self.chart.createDefaultAxes()
         self.chart_view.setChart(self.chart)
+
+        # 用于跟踪切片对象的字典
+        self.slice_map = {}
 
     def setup_timer(self):
         """
@@ -117,25 +123,53 @@ class MainWindow(QMainWindow):
         """
         self.update_timer = QTimer()
         self.update_timer.timeout.connect(self.update_chart)
-        self.update_timer.start(5000)
+        self.update_timer.start(1000)
 
     def update_chart(self):
-        """
-        更新图表
-        """
+        """增量更新饼图的核心方法"""
         if self.draw_count == self.packet_count:
             return
-        self.draw_count = self.packet_count  # 更新绘制计数
-        series = QPieSeries()
+        self.draw_count = self.packet_count
+
         total = sum(self.protocol_stats.values())
+        current_protocols = {p for p, c in self.protocol_stats.items() if c > 0}
 
-        for protocol, count in self.protocol_stats.items():
-            if count > 0:
-                percentage = count / total * 100
-                series.append(f"{protocol} ({count} | {percentage:.1f}%)", count).setLabelVisible(True)
+        # 清理无数据的图表
+        if total == 0:
+            self.series.clear()
+            self.slice_map.clear()
+            return
 
-        self.chart.removeAllSeries()
-        self.chart.addSeries(series)
+        # 计算需要移除的协议
+        existing_protocols = set(self.slice_map.keys())
+        removed_protocols = existing_protocols - current_protocols
+
+        # 移除不再存在的协议切片
+        for protocol in removed_protocols:
+            if protocol in self.slice_map:
+                self.series.remove(self.slice_map[protocol])
+                del self.slice_map[protocol]
+
+        # 更新或添加切片
+        for protocol in current_protocols:
+            count = self.protocol_stats[protocol]
+            percentage = count / total * 100
+            label = f"{protocol} ({count} | {percentage:.1f}%)"
+
+            if protocol in self.slice_map:
+                # 更新现有切片
+                slice = self.slice_map[protocol]
+                slice.setValue(count)
+                slice.setLabel(label)
+            else:
+                # 添加新切片并配置样式
+                new_slice = self.series.append(label, count)
+                new_slice.setLabelVisible(True)
+                self.slice_map[protocol] = new_slice
+
+        # 优化标签显示
+        for s in self.series.slices():
+            s.setLabelPosition(QPieSlice.LabelOutside)
 
     def start_sniffing(self):
         """
