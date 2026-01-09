@@ -18,6 +18,11 @@ KaaSniffer 是一个支持网络流量分析的工具，可用于监控和解析
 2. 进入项目目录，并根据文档安装依赖：
    ```bash
    cd KaaSniffer
+   pip install -r requirements.txt
    ```
 
 3. 启动 KaaSniffer，开始抓包分析。
+
+   ```bash
+   python main.py
+   ```
